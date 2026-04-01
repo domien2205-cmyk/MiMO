@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <title>QuizPDF</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.min.js"></script>
+</head>
+<body class="bg-slate-950 text-white p-6">
+  <div class="max-w-xl mx-auto">
+    <h1 class="text-3xl font-bold text-center mb-8">📚 QuizPDF</h1>
+    
+    <!-- Area di caricamento -->
+    <div id="uploadArea" class="border-2 border-dashed border-slate-600 p-10 rounded-2xl text-center cursor-pointer hover:border-blue-500">
+      <input type="file" id="pdfInput" accept="application/pdf" class="hidden">
+      <p id="label">Clicca qui per caricare il PDF</p>
+    </div>
+
+    <div id="debug" class="mt-4 text-red-400 text-sm italic"></div>
+    <div id="results" class="mt-8 space-y-4"></div>
+  </div>
+
+  <script>
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.7.76/pdf.worker.min.mjs';
+
+    const input = document.getElementById('pdfInput');
+    const uploadArea = document.getElementById('uploadArea');
+    const debug = document.getElementById('debug');
+    const results = document.getElementById('results');
+
+    uploadArea.onclick = () => input.click();
+
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+
+      debug.innerText = "Caricamento: " + file.name + "...";
+      
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+        debug.innerText = "PDF caricato: " + pdf.numPages + " pagine. Estraggo testo...";
+
+        let text = "";
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const content = await page.getTextContent();
+          text += content.items.map(item => item.str).join(" ");
+        }
+
+        if (text.length < 50) {
+          debug.innerText = "Errore: Testo troppo breve. Il PDF è un'immagine?";
+          return;
+        }
+
+        debug.innerText = "Testo estratto (" + text.length + " caratteri). Genero quiz...";
+        
+        // Generazione quiz semplificata
+        const sentences = text.match(/[^.!?]+[.!?]+/g) || [];
+        const random = sentences.sort(() => 0.5 - Math.random()).slice(0, 3);
+        
+        results.innerHTML = "<h2 class='text-xl font-bold'>Quiz generato:</h2>";
+        random.forEach((s, i) => {
+          results.innerHTML += `
+            <div class='bg-slate-900 p-4 rounded-xl'>
+              <p class='mb-2'>${i+1}. ${s}</p>
+              <button class='bg-blue-600 px-4 py-1 rounded' onclick="this.innerText='Vero'">Vero</button>
+              <button class='bg-blue-600 px-4 py-1 rounded' onclick="this.innerText='Falso'">Falso</button>
+            </div>`;
+        });
+        debug.innerText = "Fatto!";
+
+      } catch (err) {
+        debug.innerText = "Errore fatale: " + err.message;
+        console.error(err);
+      }
+    };
+  </script>
+</body>
+</html>
